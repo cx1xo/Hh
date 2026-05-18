@@ -4,8 +4,8 @@ export default async function Home({ searchParams }) {
 
   let ogData = {
     title: "Viral Video Clip +3",
-    image: "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7", 
-    destination: "https://google.com" 
+    image: "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7", // Backup image
+    destination: "https://google.com" // Backup redirect
   };
 
   if (targetUrl) {
@@ -19,23 +19,34 @@ export default async function Home({ searchParams }) {
       });
       const html = await res.text();
       
-      const imgMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']*)["']/i) || 
-                       html.match(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']*)["']/i) ||
+      // 🖼️ 1. Image nikalne ka special tareeqa (Jo aap ke HTML layout ke mutabiq hai)
+      const imgMatch = html.match(/src=["'](https:\/\/blogger\.googleusercontent\.com\/img\/b\/[^"']+)["']/i) ||
+                       html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']*)["']/i) || 
                        html.match(/<img[^>]*src=["']([^"']*)["']/i);
-      if (imgMatch) ogData.image = imgMatch[1];
+      if (imgMatch) {
+        ogData.image = imgMatch[1];
+      }
       
+      // 📝 2. Title nikalne ka tareeqa
       const titleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']*)["']/i) ||
                         html.match(/<title>([^<]*)<\/title>/i);
-      if (titleMatch) ogData.title = titleMatch[1];
+      if (titleMatch) {
+        ogData.title = titleMatch[1];
+      }
       
-      const urlMatches = html.match(/href=["'](https?:\/\/[^"']+)["']/gi);
-      if (urlMatches) {
-        for (let rawMatch of urlMatches) {
-            let link = rawMatch.replace(/href=["']|["']/gi, '');
-            if (!link.includes('blogspot.com') && !link.includes('google.com') && !link.includes('w3.org')) {
-                ogData.destination = link;
-                break; 
-            }
+      // 🔗 3. AdSterra Link nikalne ka special regex (Jo pure text mein se bhi dhoond le ga)
+      const rawLinks = html.match(/https?:\/\/[^\s"'<>]+/g);
+      if (rawLinks) {
+        const foundLink = rawLinks.find(link => 
+          !link.includes('blogspot.com') && 
+          !link.includes('google.com') && 
+          !link.includes('w3.org') && 
+          !link.includes('blogger.com') && 
+          !link.includes('whatsapp.com')
+        );
+        if (foundLink) {
+          // Agar link ke aakhir mein quotation mark ya kachra bacha ho to saaf karein
+          ogData.destination = foundLink.split('"')[0].split("'")[0];
         }
       }
     } catch (e) {
@@ -45,6 +56,14 @@ export default async function Home({ searchParams }) {
 
   return (
     <>
+      <title>{ogData.title}</title>
+      <meta property="og:title" content={ogData.title} />
+      <meta property="og:image" content={ogData.image} />
+      <meta property="og:description" content="Click to watch full content." />
+      <meta property="og:type" content="article" />
+      <meta property="og:image:width" content="1200" />
+      <meta property="og:image:height" content="630" />
+
       <script
         dangerouslySetInnerHTML={{
           __html: `
@@ -56,8 +75,8 @@ export default async function Home({ searchParams }) {
         }}
       />
       <div style={{ textAlign: 'center', marginTop: '20%', fontFamily: 'sans-serif', color: '#333' }}>
-        <h2>Loading Video Player...</h2>
-        <p>Please wait while the secure stream configures.</p>
+        <h2>Loading Secure Player...</h2>
+        <p>Please wait while the stream configures.</p>
       </div>
     </>
   );
